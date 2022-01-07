@@ -54,7 +54,7 @@ class Recruit():
         self.events = events
 
 filenames = []
-folders = ["50FR"]
+folders = ["50FR", "100FR", "200FR"]
 for folder in folders:
     files = os.listdir(folder)
     files = [x for x in files if x.split(".")[1]=='csv']  # Remove non csvs
@@ -102,15 +102,18 @@ for filename, year in filenames:
 # Hard coded times
 swimmers["Wilson, Zarek"].add_time("50 FR SCY", 15, "21.70")  # This is a converted time; original LCM was 24.83
 
-def get_time_list(event, age, reverse=True, top=1000):
+def get_time_list(event, age, reverse=True, top=1000, age_in_2021=None):
     times = []
     for key in swimmers:
+        if age_in_2021 is not None and swimmers[key].age_in_2021 != age_in_2021:
+            continue
         time = swimmers[key].get_time(event, age)
         if time is not None:
             times.append(time)
     times.sort(reverse=reverse)
     # Only interested in top x number
-    times = times[-top:]
+    if top is not None:
+        times = times[-top:]
     if len(times) != top:
         print(f"Warning: not enough people in {age} y/o {event}")
     return times

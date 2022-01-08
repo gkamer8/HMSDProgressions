@@ -54,7 +54,7 @@ class Recruit():
         self.events = events
 
 filenames = []
-folders = ["50FR", "100FR", "200FR"]
+folders = ["50FR", "100FR", "200FR", "500FR"]
 for folder in folders:
     files = os.listdir(folder)
     files = [x for x in files if x.split(".")[1]=='csv']  # Remove non csvs
@@ -75,6 +75,20 @@ recruits = [
             Recruit("McFadden, Henry", ["500 FR SCY", "200 FR SCY", "200 FL SCY"]),
             Recruit("Denbrok, Tristan", ["200 FR SCY", "500 FR SCY"]),
             Recruit("Craft, Sam", ["200 FR SCY", "500 FR SCY"]),
+            # Distance
+            Recruit("Dunlap, Willi", ["400 IM SCY", "1650 FR SCY", "1000 FR SCY", "500 FR SCY"]),
+            # Backstroke
+            Recruit("Peterson, Andy", ["200 BK SCY", "200 FL SCY"]),
+            Recruit("Beehler, Matthew", ["200 BK SCY"]),
+            Recruit("Hagar, Tommy", ["200 BK SCY"]),
+            # Fly
+            Recruit("Schmitt, David", ["100 FL SCY", "200 FL SCY"]),
+            Recruit("Baffico, Felipe", ["100 FL SCY", "200 FL SCY"]),
+            Recruit("Pospishil, Jaden", ["100 FL SCY", "50 FR SCY", "100 FR SCY", "100 BK SCY"]),
+            # Note: Flanders' time on sheets is LCM
+            Recruit("Flanders, George", ["100 FL SCY"]),
+            Recruit("Gold, Evan", ["100 FL SCY", "200 FL SCY"]),
+            Recruit("Kharun, Ilya", ["100 FL SCY", "200 FL SCY", "50 FR SCY"]),
             ]
 
 swimmers = dict()  # name to swimmer object
@@ -122,6 +136,11 @@ def get_percentile(mylist, value):
     for i, x in enumerate(mylist):
         if value >= x:
             return i / len(mylist)
+
+def get_rank(mylist, value):
+    for i, x in enumerate(mylist):
+        if value >= x:
+            return len(mylist) - i + 1
     
 # Higher is better
 def get_improvement_in_percentile(swimmer_obj, ages, event):
@@ -135,7 +154,21 @@ def get_improvement_in_percentile(swimmer_obj, ages, event):
 
     percentile1 = get_percentile(times1, time1)
     percentile2 = get_percentile(times2, time2)
-    return percentile2 - percentile1 
+    return percentile2 - percentile1
+
+# Higher is better
+def get_improvement_in_rank(swimmer_obj, ages, event):
+    times1 = get_time_list(event, ages[0])
+    times2 = get_time_list(event, ages[1])
+
+    time1 = swimmer_obj.get_time(event, ages[0])
+    time2 = swimmer_obj.get_time(event, ages[1])
+    if time1 is None or time2 is None:
+        return None
+
+    rank1 = get_rank(times1, time1)
+    rank2 = get_rank(times2, time2)
+    return rank1 - rank2
 
 for recruit in recruits:
     try:

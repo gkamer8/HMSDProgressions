@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import pickle
 
 def time_to_seconds(time_string):
     if ":" in time_string:
@@ -46,75 +47,50 @@ class Swimmer():
             return None
         return self.times[event][ages[0]] - self.times[event][ages[1]]
 
-
 class Recruit():
     # Events is a list of event strings of form: "50 FR SCY"
     def __init__(self, name, events):
         self.name = name
         self.events = events
 
-filenames = []
-folders = ["50FR", "100FR", "200FR", "500FR"]
-for folder in folders:
-    files = os.listdir(folder)
-    files = [x for x in files if x.split(".")[1]=='csv']  # Remove non csvs
-    # Expectation is that filenames have year at the beginning with other info followed by underscores
-    folder_fnames = [(x, int(x.split("_")[0])) for x in files]
-    filenames.extend([(folder + "/" + x, y) for x, y in folder_fnames])
 
-# Hard code recruits
-recruits = [
-            # Sprint
-            Recruit("Wilson, Zarek", ["50 FR SCY", "100 FR SCY", "200 FR SCY", "100 FL SCY"]),
-            Recruit("Wang, Sonny", ["50 FR SCY", "100 FR SCY"]),
-            Recruit("Duncan, Cade", ["50 FR SCY", "100 FR SCY"]),
-            Recruit("Dalbey, Tristan", ["50 FR SCY", "100 FR SCY", "200 FR SCY"]),
-            Recruit("Wehbe, Greg", ["50 FR SCY", "100 FR SCY", "200 FR SCY"]),
-            Recruit("Pilkinton, Oliver", ["50 FR SCY", "100 FR SCY"]),
-            # Mid
-            Recruit("McFadden, Henry", ["500 FR SCY", "200 FR SCY", "200 FL SCY"]),
-            Recruit("Denbrok, Tristan", ["200 FR SCY", "500 FR SCY"]),
-            Recruit("Craft, Sam", ["200 FR SCY", "500 FR SCY"]),
-            # Distance
-            Recruit("Dunlap, Willi", ["400 IM SCY", "1650 FR SCY", "1000 FR SCY", "500 FR SCY"]),
-            # Backstroke
-            Recruit("Peterson, Andy", ["200 BK SCY", "200 FL SCY"]),
-            Recruit("Beehler, Matthew", ["200 BK SCY"]),
-            Recruit("Hagar, Tommy", ["200 BK SCY"]),
-            # Fly
-            Recruit("Schmitt, David", ["100 FL SCY", "200 FL SCY"]),
-            Recruit("Baffico, Felipe", ["100 FL SCY", "200 FL SCY"]),
-            Recruit("Pospishil, Jaden", ["100 FL SCY", "50 FR SCY", "100 FR SCY", "100 BK SCY"]),
-            # Note: Flanders' time on sheets is LCM
-            Recruit("Flanders, George", ["100 FL SCY"]),
-            Recruit("Gold, Evan", ["100 FL SCY", "200 FL SCY"]),
-            Recruit("Kharun, Ilya", ["100 FL SCY", "200 FL SCY", "50 FR SCY"]),
-            ]
+def save_data(fname="swimmer_data.sav"):
 
-swimmers = dict()  # name to swimmer object
+    filenames = []
+    folders = ["50FR", "100FR", "200FR", "500FR", "1000FR", "1650FR", "400IM", "100BK", "100FL", "200BK", "200FL"]
+    for folder in folders:
+        files = os.listdir(folder)
+        files = [x for x in files if x.split(".")[1]=='csv']  # Remove non csvs
+        # Expectation is that filenames have year at the beginning with other info followed by underscores
+        folder_fnames = [(x, int(x.split("_")[0])) for x in files]
+        filenames.extend([(folder + "/" + x, y) for x, y in folder_fnames])
 
-for filename, year in filenames:
-    # Replace equals signs, first (weird USA swimming thing)
-    with open(filename, "r") as fhand:
-        text = fhand.read()
-    text = text.replace("=", "")
-    with open(filename, "w") as fhand:
-        fhand.write(text)
+    swimmers = dict()  # name to swimmer object
 
-    data = pd.read_csv(filename)
-    
-    for i, row in data.iterrows():
-        name = row['full_name']
-        age = row['swimmer_age']
+    for filename, year in filenames:
+        # Replace equals signs, first (weird USA swimming thing)
+        with open(filename, "r") as fhand:
+            text = fhand.read()
+        text = text.replace("=", "")
+        with open(filename, "w") as fhand:
+            fhand.write(text)
 
-        if name not in swimmers:
-            age_in_2021 = 2021 - year + age
-            swimmers[name] = Swimmer(name, age_in_2021)
+        data = pd.read_csv(filename)
         
-        swimmers[name].add_time(row['event_desc'], age, row['alt_adj_swim_time_formatted'])
+        for i, row in data.iterrows():
+            name = row['full_name']
+            age = row['swimmer_age']
 
-# Hard coded times
-swimmers["Wilson, Zarek"].add_time("50 FR SCY", 15, "21.70")  # This is a converted time; original LCM was 24.83
+            if name not in swimmers:
+                age_in_2021 = 2021 - year + age
+                swimmers[name] = Swimmer(name, age_in_2021)
+            
+            swimmers[name].add_time(row['event_desc'], age, row['alt_adj_swim_time_formatted'])
+    
+    # Hard coded times
+    swimmers["Wilson, Zarek"].add_time("50 FR SCY", 15, "21.70")  # This is a converted time; original LCM was 24.83
+    
+    pickle.dump(swimmers, open(fname, "wb"))
 
 def get_time_list(event, age, reverse=True, top=1000, age_in_2021=None):
     times = []
@@ -170,16 +146,46 @@ def get_improvement_in_rank(swimmer_obj, ages, event):
     rank2 = get_rank(times2, time2)
     return rank1 - rank2
 
+# Hard code recruits
+recruits = [
+            # Sprint
+            Recruit("Wilson, Zarek", ["50 FR SCY", "100 FR SCY", "200 FR SCY", "100 FL SCY"]),
+            Recruit("Wang, Sonny", ["50 FR SCY", "100 FR SCY"]),
+            Recruit("Duncan, Cade", ["50 FR SCY", "100 FR SCY"]),
+            Recruit("Dalbey, Tristan", ["50 FR SCY", "100 FR SCY", "200 FR SCY"]),
+            Recruit("Wehbe, Greg", ["50 FR SCY", "100 FR SCY", "200 FR SCY"]),
+            Recruit("Pilkinton, Oliver", ["50 FR SCY", "100 FR SCY"]),
+            # Mid
+            Recruit("McFadden, Henry", ["500 FR SCY", "200 FR SCY", "200 FL SCY"]),
+            Recruit("Denbrok, Tristan", ["200 FR SCY", "500 FR SCY"]),
+            Recruit("Craft, Sam", ["200 FR SCY", "500 FR SCY"]),
+            # Distance
+            Recruit("Dunlap, Willi", ["400 IM SCY", "1650 FR SCY", "1000 FR SCY", "500 FR SCY"]),
+            # Backstroke
+            Recruit("Peterson, Andy", ["200 BK SCY", "200 FL SCY"]),
+            Recruit("Beehler, Matthew", ["200 BK SCY"]),
+            Recruit("Hagar, Tommy", ["200 BK SCY"]),
+            # Fly
+            Recruit("Schmitt, David", ["100 FL SCY", "200 FL SCY"]),
+            Recruit("Baffico, Felipe", ["100 FL SCY", "200 FL SCY"]),
+            Recruit("Pospishil, Jaden", ["100 FL SCY", "50 FR SCY", "100 FR SCY", "100 BK SCY"]),
+            # Note: Flanders' time on sheets is LCM
+            Recruit("Flanders, George", ["100 FL SCY"]),
+            Recruit("Gold, Evan", ["100 FL SCY", "200 FL SCY"]),
+            Recruit("Kharun, Ilya", ["100 FL SCY", "200 FL SCY", "50 FR SCY"]),
+            ]
+
+# save_data()
+swimmers = pickle.load('swimmer_data.sav')
+
 for recruit in recruits:
     try:
         times = swimmers[recruit.name].times
-        print(recruit.name + ": " + str(times))
-        """
-        imp = get_improvement_in_percentile(swimmers[recruit.name], (15, 16), "50 FR SCY")
-        if imp is not None:
-            print("Imp Percentile: " + str(round(imp, 3)))
-        else:
-            print("Imp Percentile: None")
-        """
+        for event in recruit.events:
+            if event not in times:
+                print(f"{event} not found for {recruit.name}")
+            else:
+                count = len(times[event])
+                print(f"{count} entries for {event} for {recruit.name}")
     except KeyError:
         print(f"{recruit.name} not found.")

@@ -55,10 +55,11 @@ class Swimmer():
 
 class Recruit():
     # Events is a list of event strings of form: "50 FR SCY"
-    def __init__(self, name, events, type):
+    def __init__(self, name, events, type, old=False):
         self.name = name
         self.events = events
         self.type = type
+        self.old = old  # Is this a college swimmer
 
 
 def save_data(fname="swimmer_data.sav"):
@@ -194,6 +195,13 @@ recruits = [
             Recruit("Flanders, George", ["100 FL SCY"], "Fly"),
             Recruit("Gold, Evan", ["100 FL SCY", "200 FL SCY"], "Fly"),
             Recruit("Kharun, Ilya", ["100 FL SCY", "200 FL SCY", "50 FR SCY"], "Fly"),
+            # Current team
+            Recruit("Chung, Matthew", ["500 FR SCY", "200 FR SCY"], "Mid", old=True),
+            Recruit("Durham, Harris", ["200 FR SCY", "100 FR SCY"], "Mid", old=True),
+            Recruit("Furrer, Corby", ["200 FR SCY", "100 FR SCY", "500 FR SCY"], "Mid", old=True),
+            Recruit("Green, Cameron", ["200 FR SCY"], "Mid", old=True),
+            Recruit("Raidt, Will", ["200 FR SCY"], "Mid", old=True),
+            Recruit("Washart, Shane", ["1650 FR SCY", "1000 FR SCY"], "Distance", old=True),
             ]
 
 # save_data()
@@ -254,13 +262,39 @@ kevin_ratings = {
     'Flanders, George': 6,
     'Dubovac, Petar': 8,
     'Gold, Evan': 8,
-    'Kharun, Ilya': 9
+    'Kharun, Ilya': 9,
 }
 
 def name_to_rec(name):
     for recruit in recruits:
         if recruit.name == name:
             return recruit
+
+# For get_advanced_rating
+# Swimmer list considers swimmers within +-class_grace age classes 
+def get_swimmer_list(swimmer, event, below=30, above=30, class_grace=2):
+    time_lst = []  # list of tuples
+    oldest_age_in_event = swimmer.get_oldest_age(event)
+    for name in swimmers:
+        swim = swimmers[name]
+        if swim.age_in_2021 >= swimmer.age_in_2021 - class_grace and swim.age_in_2021 <= swimmer.age_in_2021 + class_grace:
+            if event in swim.times:
+                times_at_same_age = [swim.times[event][x] for x in swim.times[event] if x == oldest_age_in_event]
+                if len(times_at_same_age) == 0:
+                    continue  # means that swimmer doesn't have a time at the same age
+                best = min(times_at_same_age)
+                time_lst.append((best, swim))
+    time_lst.sort(key=lambda x: x[0])
+    # get index
+    index = 0
+    for i, (time, swim) in enumerate(time_lst):
+        if swim.name == swimmer.name:
+            index = i
+            break
+    bottom_limit = min(index+1+below, len(time_lst))
+    upper_limit = max(0, index-above)
+    to_return = time_lst[upper_limit:bottom_limit]
+    return [x[1] for x in to_return]
 
 def get_rating():
 
@@ -304,25 +338,94 @@ def get_rating():
     sorted_scores = dict(sorted(recruit_scores.items(), key=lambda item: item[1], reverse=True))
     for rec in sorted_scores:
         score = z_to_letter(sorted_scores[rec])
-        kevin_score = kevin_ratings[rec]
+        kevin_score = "-" if rec not in kevin_ratings else kevin_ratings[rec]
         rec_type = name_to_rec(rec)
         print(f"{rec}: {score} ({kevin_score}), {rec_type.type}")
 
 
-def get_derivative_rating():
+def get_advanced_rating():
     # Look at most recent time
-    # Get list of top x (100?)
+    # Get list of top x (everyone above 20 below the swimmer?)
     # Get those kids' improvements in time
-    # Get rank of improvement
-    # Apply same transformation - get z score, etc.
+    # Calculate a z score for each age jump
+    # Apply same transformation as before to get final grade
+
+    recruit_scores = dict()
+
+    # Age drop off coefficient for weighting
+    age_gamma = .5
+    # Event drop off coefficient for weighting
+    event_gamma = .5
+
+    age_order = [(16, 17), (15, 16), (14, 15), (13, 14)]
+
+    # Remove new times for old recruits
+    for recruit in recruits:
+        if recruit.old:
+            swim = swimmers[recruit.name]
+            for event in swim.times:
+                swim.times[event] = {k: swim.times[event][k] for k in swim.times[event] if k<=17}
 
     for recruit in recruits:
+        event_imps = []
         for event in recruit.events:
+            improvements = {
+                (13, 14): [],
+                (14, 15): [],
+                (15, 16): [],
+                (16, 17): []
+            }
             swimmer = swimmers[recruit.name]
-            age = swimmer.get_oldest_age(event)
-            # The following needs to be more of a get swimmer list
-            # lst = get_time_list(event, age, top_if_same_class=100, age_in_2021=swimmer.age_in_2021)
+            swim_lst = get_swimmer_list(swimmer, event, below=30, above=30)
+            for swim in swim_lst:
+                for ages in improvements:
+                    imp = swim.get_improvement(event, ages)
+                    if imp is not None:
+                        improvements[ages].append(imp)
+            
+            my_swimmer_imps = dict()
+            for ages in improvements:
+                my_swimmer_imps[ages] = swimmer.get_improvement(event, ages)
+            my_swimmer_imp_z = dict()
+            for ages in improvements:
+                if len(improvements[ages]) <= 1:
+                    mu = 0
+                    stdev = 100  # just making the z score small
+                else:
+                    mu = statistics.mean(improvements[ages])
+                    stdev = statistics.stdev(improvements[ages])
+                if my_swimmer_imps[ages] is not None:
+                    my_swimmer_imp_z[ages] = (my_swimmer_imps[ages] - mu)/stdev
+                else:
+                    my_swimmer_imp_z[ages] = None
+            age_imps = []
+            for ages in age_order:
+                if my_swimmer_imp_z[ages] is not None:
+                    age_imps.append(my_swimmer_imp_z[ages])
+            print(swimmer.name + ": " + str(age_imps) + ", " + event)
+            total = 0
+            for i, x in enumerate(age_imps):
+                total += x * age_gamma ** i
+            event_imps.append(total)
+        total = 0
+        for i, x in enumerate(event_imps):
+            total += x * event_gamma ** i
+        recruit_scores[recruit.name] = total
 
+    # Renormalization
+    all_scores = [recruit_scores[k] for k in recruit_scores]
+    xbar = statistics.mean(all_scores)
+    stdev = statistics.stdev(all_scores)
+    for rec in recruit_scores:
+        recruit_scores[rec] = (recruit_scores[rec] - xbar) / stdev
+    
+    sorted_scores = dict(sorted(recruit_scores.items(), key=lambda item: item[1], reverse=True))
+    for rec in sorted_scores:
+        score = z_to_letter(sorted_scores[rec])
+        kevin_score = "-" if rec not in kevin_ratings else kevin_ratings[rec]
+        rec_type = name_to_rec(rec)
+        print(f"{rec}: {score} ({kevin_score}), {rec_type.type}")
 
+get_advanced_rating()
 
-get_rating()
+# get_rating()
